@@ -1,0 +1,40 @@
+---
+description: Content model and pricing rules for the Airbrush Shopify Theme (collections, metaobjects, metafields, and price builder).
+globs:
+  - "sections/*.liquid"
+  - "snippets/*.liquid"
+  - "templates/**/*.liquid"
+  - "assets/**/*.{js,ts}"
+  - "src/**/*.{js,ts,jsx,tsx}"
+alwaysApply: true
+---
+
+# Airbrush Theme Content + Data Model
+
+This rule attaches the core PRD for the airbrush theme so AI work on theme Liquid and JS always respects the data model.
+
+Read the full PRD here:  
+[Airbrush Theme PRD](mdc:.cursor/prd/airbrush-theme-content.md)
+
+## What this PRD defines
+
+- Design category collections and item collections.
+- Metaobjects for:
+  - Items
+  - Size options
+  - Font styles
+  - Color options
+  - Background patterns
+  - Extras
+- Product metafields under the `customization` namespace.
+- Price builder rules:
+  - No Shopify variants
+  - All pricing comes from metaobjects + metafields
+  - Cart line item properties must capture all selections and final price.
+
+When generating or editing:
+
+- Liquid templates for product pages and sections.
+- JS/TS for price calculation and cart behavior.
+
+Use the PRD as the source of truth.
