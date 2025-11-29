@@ -325,5 +325,24 @@
       "quantity_maximum": "Maximum of {{ maximum }}",
       "in_cart": "in cart"
     }
+  },
+  "airbrush": {
+    "customization": {
+      "total_label": "Total",
+      "item_label": "Select Item",
+      "size_label": "Select Size",
+      "size_placeholder": "Choose a size",
+      "font_label": "Select Font Style",
+      "color_label": "Select Color",
+      "background_label": "Select Background",
+      "extras_label": "Add Extras",
+      "price_note": "Final price will be confirmed before checkout"
+    }
+  },
+  "settings": {
+    "product_customization": {
+      "heading": "Airbrush Customization",
+      "subheading": "Choose your item, size, and font style."
+    }
   }
 }

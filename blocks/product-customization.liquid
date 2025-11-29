@@ -1,0 +1,634 @@
+{%- liquid
+  assign block_settings = block.settings
+  assign product = closest.product
+
+  if request.visual_preview_mode and product == blank
+    assign product = collections.all.products.first
+  endif
+
+  comment
+    Use the correct namespace: 'custom' and correct keys
+  endcomment
+  assign items_metafield = product.metafields.custom.item_types
+  assign fonts_metafield = product.metafields.custom.font_styles
+  assign colors_metafield = product.metafields.custom.color_options
+  assign backgrounds_metafield = product.metafields.custom.background_patterns
+  assign extras_metafield = product.metafields.custom.extras
+  assign base_price_metafield = product.metafields.custom.base_design_price
+
+  comment
+    Metafield values are directly accessible (no .value needed for lists)
+  endcomment
+  if items_metafield.value != blank
+    assign items = items_metafield.value
+  else
+    assign items = items_metafield
+  endif
+
+  if fonts_metafield.value != blank
+    assign fonts = fonts_metafield.value
+  else
+    assign fonts = fonts_metafield
+  endif
+
+  if colors_metafield.value != blank
+    assign colors = colors_metafield.value
+  else
+    assign colors = colors_metafield
+  endif
+
+  if backgrounds_metafield.value != blank
+    assign backgrounds = backgrounds_metafield.value
+  else
+    assign backgrounds = backgrounds_metafield
+  endif
+
+  if extras_metafield.value != blank
+    assign extras = extras_metafield.value
+  else
+    assign extras = extras_metafield
+  endif
+-%}
+
+{%- if base_price_metafield != blank -%}
+  {%- assign base_design_price = base_price_metafield | money_without_currency | replace: ',', '' | plus: 0 -%}
+{%- else -%}
+  {%- assign base_design_price = product.price | money_without_currency | replace: ',', '' | plus: 0 -%}
+{%- endif -%}
+
+<product-customization-component
+  class="product-customization spacing-style"
+  style="{% render 'spacing-style', settings: block_settings %}"
+  {{ block.shopify_attributes }}
+  data-base-design-price="{{ base_design_price }}"
+>
+  {% if block_settings.heading != blank %}
+    <h2 class="product-customization__heading">
+      {{ block_settings.heading | escape }}
+    </h2>
+  {% endif %}
+
+  {% if block_settings.subheading != blank %}
+    <p class="product-customization__subheading">
+      {{ block_settings.subheading | escape }}
+    </p>
+  {% endif %}
+
+  <div class="product-customization__grid">
+    {%- if items != blank -%}
+      <fieldset class="product-customization__group" data-group="item">
+        <legend class="product-customization__group-title">
+          {{ 'airbrush.customization.item_label' | t }}
+        </legend>
+
+        <div class="product-customization__options product-customization__options--with-images">
+          {%- for item in items -%}
+            {%- assign item_price = item.price | default: 0 -%}
+            {%- assign input_id = 'CustomizationItem-' | append: section.id | append: '-' | append: forloop.index -%}
+            
+            {%- comment -%} Encode sizes_supported as JSON for JS to use {%- endcomment -%}
+            {%- assign sizes_data = '' -%}
+            {%- if item.sizes_supported.value != blank -%}
+              {%- assign sizes_array = '' -%}
+              {%- for size in item.sizes_supported.value -%}
+                {%- assign size_price = size.additional_price | default: 0 -%}
+                {%- assign size_obj = '{"label":"' | append: size.size_label | append: '","price":' | append: size_price | append: '}' -%}
+                {%- if forloop.first -%}
+                  {%- assign sizes_array = size_obj -%}
+                {%- else -%}
+                  {%- assign sizes_array = sizes_array | append: ',' | append: size_obj -%}
+                {%- endif -%}
+              {%- endfor -%}
+              {%- assign sizes_data = '[' | append: sizes_array | append: ']' -%}
+            {%- endif -%}
+            
+            <label
+              class="product-customization__option product-customization__option--image"
+              for="{{ input_id }}"
+            >
+              <input
+                id="{{ input_id }}"
+                type="radio"
+                name="properties[Selected Item]"
+                value="{{ item.item_name | escape }}"
+                class="product-customization__input visually-hidden"
+                data-price="{{ item_price }}"
+                data-customization-role="item"
+                data-sizes-supported="{{ sizes_data | escape }}"
+                required
+              >
+              
+              {%- if item.preview_image != blank -%}
+                <span class="product-customization__option-image">
+                  {{
+                    item.preview_image
+                    | image_url: width: 200
+                    | image_tag: alt: item.item_name, loading: 'lazy', widths: '100, 200, 300'
+                  }}
+                </span>
+              {%- endif -%}
+              
+              <span class="product-customization__option-content">
+                <span class="product-customization__option-title">
+                  {{ item.item_name }}
+                </span>
+                {%- if item_price != blank and item_price != 0 -%}
+                  {%- assign item_price_for_display = item_price | times: 100 -%}
+                  <span class="product-customization__option-price">
+                    +{{ item_price_for_display | money }}
+                  </span>
+                {%- endif -%}
+              </span>
+            </label>
+          {%- endfor -%}
+        </div>
+      </fieldset>
+    {%- endif -%}
+
+    {%- comment -%} Size selector - dynamically populated by JS based on selected item {%- endcomment -%}
+    <div class="product-customization__group" data-group="size" hidden>
+      <label class="product-customization__group-title" for="CustomizationSize-{{ section.id }}">
+        {{ 'airbrush.customization.size_label' | t }}
+      </label>
+
+      <select
+        id="CustomizationSize-{{ section.id }}"
+        name="properties[Selected Size]"
+        class="product-customization__select"
+        data-customization-role="size"
+        data-size-select
+        required
+      >
+        <option value="" disabled selected>{{ 'airbrush.customization.size_placeholder' | t }}</option>
+        {%- comment -%} Options will be populated by JS when item is selected {%- endcomment -%}
+      </select>
+    </div>
+
+    {%- if fonts != blank -%}
+      <fieldset class="product-customization__group" data-group="font">
+        <legend class="product-customization__group-title">
+          {{ 'airbrush.customization.font_label' | t }}
+        </legend>
+
+        <div class="product-customization__options">
+          {%- for font in fonts -%}
+            {%- assign font_price = font.price | default: 0 -%}
+            {%- assign input_id = 'CustomizationFont-' | append: section.id | append: '-' | append: forloop.index -%}
+            <label
+              class="product-customization__option"
+              for="{{ input_id }}"
+            >
+              <input
+                id="{{ input_id }}"
+                type="radio"
+                name="properties[Selected Font Style]"
+                value="{{ font.font_name | escape }}"
+                class="product-customization__input visually-hidden"
+                data-price="{{ font_price }}"
+                data-customization-role="font"
+              >
+              <span class="product-customization__option-content">
+                <span class="product-customization__option-title">
+                  {{ font.font_name }}
+                </span>
+                {%- if font_price != blank and font_price != 0 -%}
+                  {%- assign font_price_for_display = font_price | times: 100 -%}
+                  <span class="product-customization__option-price">
+                    +{{ font_price_for_display | money }}
+                  </span>
+                {%- endif -%}
+              </span>
+            </label>
+          {%- endfor -%}
+        </div>
+      </fieldset>
+    {%- endif -%}
+
+    {%- if colors != blank -%}
+      <fieldset class="product-customization__group" data-group="color">
+        <legend class="product-customization__group-title">
+          {{ 'airbrush.customization.color_label' | t }}
+        </legend>
+
+        <div class="product-customization__options">
+          {%- for color in colors -%}
+            {%- assign color_price = color.price | default: 0 -%}
+            {%- assign input_id = 'CustomizationColor-' | append: section.id | append: '-' | append: forloop.index -%}
+            <label
+              class="product-customization__option"
+              for="{{ input_id }}"
+            >
+              <input
+                id="{{ input_id }}"
+                type="radio"
+                name="properties[Selected Color]"
+                value="{{ color.name | escape }}"
+                class="product-customization__input visually-hidden"
+                data-price="{{ color_price }}"
+                data-customization-role="color"
+              >
+              <span class="product-customization__option-content">
+                <span class="product-customization__option-title">
+                  {{ color.name }}
+                </span>
+                {%- if color.price != blank and color.price != 0 -%}
+                  <span class="product-customization__option-price">
+                    +{{ color.price | money }}
+                  </span>
+                {%- endif -%}
+              </span>
+            </label>
+          {%- endfor -%}
+        </div>
+      </fieldset>
+    {%- endif -%}
+
+    {%- if backgrounds != blank -%}
+      <fieldset class="product-customization__group" data-group="background">
+        <legend class="product-customization__group-title">
+          {{ 'airbrush.customization.background_label' | t }}
+        </legend>
+
+        <div class="product-customization__options">
+          {%- for background in backgrounds -%}
+            {%- assign background_price = background.price | default: 0 -%}
+            {%- assign input_id = 'CustomizationBackground-' | append: section.id | append: '-' | append: forloop.index -%}
+            <label
+              class="product-customization__option"
+              for="{{ input_id }}"
+            >
+              <input
+                id="{{ input_id }}"
+                type="radio"
+                name="properties[Selected Background]"
+                value="{{ background.name | escape }}"
+                class="product-customization__input visually-hidden"
+                data-price="{{ background_price }}"
+                data-customization-role="background"
+              >
+              <span class="product-customization__option-content">
+                <span class="product-customization__option-title">
+                  {{ background.name }}
+                </span>
+                {%- if background.price != blank and background.price != 0 -%}
+                  <span class="product-customization__option-price">
+                    +{{ background.price | money }}
+                  </span>
+                {%- endif -%}
+              </span>
+            </label>
+          {%- endfor -%}
+        </div>
+      </fieldset>
+    {%- endif -%}
+
+    {%- if extras != blank -%}
+      <fieldset class="product-customization__group" data-group="extra">
+        <legend class="product-customization__group-title">
+          {{ 'airbrush.customization.extras_label' | t }}
+        </legend>
+
+        <div class="product-customization__options">
+          {%- for extra in extras -%}
+            {%- assign extra_price = extra.price | default: 0 -%}
+            {%- assign input_id = 'CustomizationExtra-' | append: section.id | append: '-' | append: forloop.index -%}
+            <label
+              class="product-customization__option"
+              for="{{ input_id }}"
+            >
+              <input
+                id="{{ input_id }}"
+                type="checkbox"
+                name="properties[Selected Extras]"
+                value="{{ extra.name | escape }}"
+                class="product-customization__input visually-hidden"
+                data-price="{{ extra_price }}"
+                data-customization-role="extra"
+              >
+              <span class="product-customization__option-content">
+                <span class="product-customization__option-title">
+                  {{ extra.name }}
+                </span>
+                {%- if extra.price != blank and extra.price != 0 -%}
+                  <span class="product-customization__option-price">
+                    +{{ extra.price | money }}
+                  </span>
+                {%- endif -%}
+              </span>
+            </label>
+          {%- endfor -%}
+        </div>
+      </fieldset>
+    {%- endif -%}
+  </div>
+
+  <div class="product-customization__summary">
+    <div class="product-customization__summary-row">
+      <dt class="product-customization__summary-label">
+        {{ 'airbrush.customization.total_label' | t }}
+      </dt>
+      <dd
+        class="product-customization__summary-value"
+        data-customization-total
+      >
+        {{ base_design_price | money }}
+      </dd>
+    </div>
+
+    <input
+      type="hidden"
+      name="properties[Final Price]"
+      value="{{ base_design_price }}"
+      data-customization-final-price-input
+    >
+    <input
+      type="hidden"
+      name="properties[Price Breakdown]"
+      value=""
+      data-customization-breakdown-input
+    >
+    
+    <div class="product-customization__note">
+      <small>{{ 'airbrush.customization.price_note' | t }}</small>
+    </div>
+  </div>
+</product-customization-component>
+
+<script
+  src="{{ 'product-customization.js' | asset_url }}"
+  type="module"
+  fetchpriority="low"
+></script>
+
+{% stylesheet %}
+  product-customization-component {
+    display: block;
+  }
+
+  .product-customization {
+    border-radius: var(--style-border-radius-inputs);
+    border: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent);
+  }
+
+  .product-customization__heading {
+    margin: 0 0 var(--padding-sm);
+    font-size: var(--font-size--md);
+  }
+
+  .product-customization__subheading {
+    margin: 0 0 var(--padding-md);
+    font-size: var(--font-size--sm);
+    color: var(--color-foreground-secondary);
+  }
+
+  .product-customization__grid {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-md, var(--padding-md));
+  }
+
+  .product-customization__group {
+    border: 0;
+    margin: 0;
+    padding: 0;
+  }
+
+  .product-customization__group-title {
+    margin: 0 0 var(--padding-xs);
+    font-size: var(--font-size--sm);
+    font-weight: 600;
+  }
+
+  .product-customization__options {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--gap-xs);
+  }
+
+  /* Image-based options layout */
+  .product-customization__options--with-images {
+    gap: var(--gap-sm);
+  }
+
+  .product-customization__option {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--gap-xs);
+    padding: var(--padding-xs) var(--padding-sm);
+    border-radius: var(--style-border-radius-inputs);
+    border: 1px solid var(--color-border);
+    cursor: pointer;
+    min-width: 0;
+    transition: border-color var(--duration-short) ease, box-shadow var(--duration-short) ease;
+  }
+
+  /* Image option variant */
+  .product-customization__option--image {
+    flex-direction: column;
+    padding: var(--padding-sm);
+    min-width: 120px;
+    max-width: 150px;
+    flex: 0 0 auto;
+  }
+
+  .product-customization__option--image .product-customization__option-content {
+    flex-direction: column;
+    width: 100%;
+    text-align: center;
+  }
+
+  .product-customization__option-image {
+    display: block;
+    width: 100%;
+    aspect-ratio: 1;
+    overflow: hidden;
+    border-radius: calc(var(--style-border-radius-inputs) - 2px);
+    margin-bottom: var(--padding-xs);
+    background: var(--color-background-secondary, #f8f9fa);
+  }
+
+  .product-customization__option-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    display: block;
+  }
+
+  .product-customization__option:has(.product-customization__input:checked) {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 1px var(--color-primary);
+  }
+
+  .product-customization__option:has(.product-customization__input:focus-visible) {
+    outline: var(--focus-outline-width) solid var(--color-primary);
+    outline-offset: var(--focus-outline-offset);
+  }
+
+  .product-customization__option-content {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: var(--gap-xs);
+  }
+
+  .product-customization__option-title {
+    font-size: var(--font-size--sm);
+    font-weight: 500;
+  }
+
+  .product-customization__option-price {
+    font-size: var(--font-size--xs);
+    color: var(--color-foreground-secondary);
+  }
+
+  /* Select dropdown styling */
+  .product-customization__select {
+    width: 100%;
+    padding: var(--padding-sm) var(--padding-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--style-border-radius-inputs);
+    font-size: var(--font-size--sm);
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    cursor: pointer;
+    transition: border-color var(--duration-short) ease;
+  }
+
+  .product-customization__select:hover {
+    border-color: var(--color-foreground-secondary);
+  }
+
+  .product-customization__select:focus {
+    outline: var(--focus-outline-width) solid var(--color-primary);
+    outline-offset: var(--focus-outline-offset);
+    border-color: var(--color-primary);
+  }
+
+  .product-customization__select:required:invalid {
+    color: var(--color-foreground-secondary);
+  }
+
+  .product-customization__input:focus-visible + .product-customization__option-content,
+  .product-customization__option:focus-visible {
+    outline: var(--focus-outline-width) solid var(--color-primary);
+    outline-offset: 2px;
+  }
+
+  .product-customization__input:checked + .product-customization__option-content,
+  .product-customization__option:has(.product-customization__input:checked) {
+    border-color: var(--color-primary);
+    background-color: color-mix(in srgb, var(--color-primary) 5%, transparent);
+  }
+
+  .product-customization__summary {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-xs);
+    margin-top: var(--padding-md);
+    padding-top: var(--padding-sm);
+    border-top: 1px solid var(--color-border);
+    font-size: var(--font-size--sm);
+  }
+
+  .product-customization__summary-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+
+  .product-customization__summary-label {
+    margin: 0;
+    font-size: var(--font-size--md);
+    font-weight: 600;
+    color: var(--color-foreground);
+  }
+
+  .product-customization__summary-value {
+    margin: 0;
+    font-size: var(--font-size--lg);
+    font-weight: 700;
+    color: var(--color-primary);
+  }
+
+  .product-customization__note {
+    padding-top: var(--padding-xs);
+    color: var(--color-foreground-secondary);
+    font-size: var(--font-size--xs);
+    text-align: center;
+  }
+{% endstylesheet %}
+
+{% schema %}
+{
+  "name": "Airbrush customization",
+  "tag": "product-customization-component",
+  "settings": [
+    {
+      "type": "text",
+      "id": "heading",
+      "label": "t:settings.product_customization.heading",
+      "default": "Customize your design"
+    },
+    {
+      "type": "text",
+      "id": "subheading",
+      "label": "t:settings.product_customization.subheading",
+      "default": "Choose your item, size, and font style."
+    },
+    {
+      "type": "header",
+      "content": "t:content.padding"
+    },
+    {
+      "type": "range",
+      "id": "padding-block-start",
+      "label": "t:settings.top",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "padding-block-end",
+      "label": "t:settings.bottom",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "padding-inline-start",
+      "label": "t:settings.left",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 16
+    },
+    {
+      "type": "range",
+      "id": "padding-inline-end",
+      "label": "t:settings.right",
+      "min": 0,
+      "max": 100,
+      "step": 1,
+      "unit": "px",
+      "default": 16
+    }
+  ],
+  "presets": [
+    {
+      "name": "Airbrush customization",
+      "category": "t:categories.product"
+    }
+  ]
+}
+{% endschema %}
+
+
